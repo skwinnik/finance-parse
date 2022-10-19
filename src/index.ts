@@ -1,3 +1,5 @@
+import { type } from "os";
+
 export default { parse };
 export { parse, dateFormat };
 
@@ -31,7 +33,7 @@ function parse(input: string): ITransaction {
 }
 
 function parseSpending(input: string): ITransaction {
-  var match = input.match(
+  let match = input.match(
     /(?<from_account>[a-zA-Z\s]*\s)?(?<amount>\d{1,}\.{0,1}\d{1,})\s?(?<currency>try|usd|eur|rub)\s(?<to_account>[A-Za-z\s]+)\;?(?<comment>.*){0,1}/i
   );
 
@@ -42,7 +44,7 @@ function parseSpending(input: string): ITransaction {
   if (!trnNl.amount || !trnNl.currency || !trnNl.to_account)
     throw Error(`parse error: ${input}`);
 
-  var fromPosting: IPosting = {
+  let fromPosting: IPosting = {
     account: getAssetAccount(trnNl.from_account || "", trnNl.currency),
     amount: -1 * +trnNl.amount,
     currency: getCurrency(trnNl.currency),
@@ -56,7 +58,7 @@ function parseSpending(input: string): ITransaction {
   if (fromPosting.amount > 0)
     throw Error(`parse error: from amount is negative: ${input}`);
 
-  var toPosting: IPosting = {
+  let toPosting: IPosting = {
     account: getExpenseAccount(trnNl.to_account || "", trnNl.currency),
     amount: +trnNl.amount,
     currency: getCurrency(trnNl.currency),
@@ -77,44 +79,47 @@ function parseSpending(input: string): ITransaction {
   };
 }
 
-function parseTransfer(input: string): ITransaction {
-  return {
-    date: dateFormat(new Date()),
-    description: input,
-    postings: [],
-    comment: undefined,
-  };
-}
-
 function getAssetAccount(account: string, currency: string): string {
   let baseToken = "Assets";
   let accountCategoryToken = getAssetCategoryToken(account);
   let accountPersonToken = getAssetPersonToken(account);
   let accountCurrency = currency.toUpperCase();
 
+  if (isPersonRequired(accountCategoryToken) && accountPersonToken === "")
+    accountPersonToken = "Pavel";
+
   return [baseToken, accountCategoryToken, accountPersonToken, accountCurrency]
     .filter((t) => t)
     .join(":");
+
+  function isPersonRequired(accountCategoryToken: AssetCategoryTokenType) {
+    return accountCategoryToken === "Cash" && currency.toUpperCase() === "TRY";
+  }
 }
 
-function getAssetPersonToken(account: string): string {
+function getAssetPersonToken(account: string): AssetPersonTokenType {
   if (account.indexOf("alena") > -1) return "Alena";
-  return "Pavel";
+  if (account.indexOf("pavel") > -1) return "Pavel";
+  return "";
 }
 
-function getAssetCategoryToken(account: string): string {
+type AssetPersonTokenType = "Alena" | "Pavel" | "";
+
+function getAssetCategoryToken(account: string): AssetCategoryTokenType {
+  if (account.indexOf("crypto") > -1) return "Crypto";
   if (account.indexOf("cash") > -1) return "Cash";
   if (account.indexOf("deniz") > -1) return "Deniz";
   if (account.indexOf("papara") > -1) return "Papara";
   return "Cash";
 }
+type AssetCategoryTokenType = "Cash" | "Deniz" | "Papara" | "Crypto";
 
 function capitalize(str: string) {
   return str[0].toUpperCase() + str.slice(1);
 }
 
 function getDecimalPlaces(currency: string) {
-  switch (currency) {
+  switch (currency.toUpperCase()) {
     case "TETHER":
       return 10;
     case "BTC":
@@ -176,4 +181,83 @@ function getExpenseAccount(account: string, currency: string): string {
 
 function trim(input: string): string {
   return input.trimStart().trimEnd();
+}
+
+function parseTransfer(input: string): ITransaction {
+  let match = input.match(
+    /transfer\s(?<from_amount>\d{1,5}\.?\d{0,5})\s(?<from_currency>usd|try|tether|busd|rub|btc)\s(?<from_account>[A-Za-z\s]+)\sto\s(?<to_amount>\d{1,5}\.?\d{0,5})\s(?<to_currency>usd|try|tether|busd|rub|btc)\s?(?<to_account>[A-Za-z\s]+)\;?(?<comment>.*){0,1}/i
+  );
+
+  if (!match || !match.groups) throw Error(`parse error: ${input}`);
+
+  const trnNl = match.groups;
+  const isExchange =
+    trnNl.to_currency &&
+    trnNl.from_currency.toLowerCase() !== trnNl.to_currency.toLowerCase();
+
+  let toExchangePosting: IPosting | null = null,
+    fromExchangePosting: IPosting | null = null;
+
+  if (!trnNl.from_account && !trnNl.to_account)
+    throw Error("needs at least one person");
+
+  var fromPosting: IPosting = {
+    account: getAssetAccount(trnNl.from_account || "", trnNl.from_currency),
+    amount: -1 * +trnNl.from_amount,
+    currency: getCurrency(trnNl.from_currency),
+    decimalPlaces: getDecimalPlaces(trnNl.from_currency),
+    decimalMantissa: getDecimalMantissa(
+      -1 * +trnNl.from_amount,
+      getDecimalPlaces(trnNl.from_currency)
+    ),
+  };
+
+  var toPosting: IPosting = {
+    account: getAssetAccount(trnNl.to_account || "", trnNl.to_currency),
+    amount: +trnNl.to_amount,
+    currency: getCurrency(trnNl.to_currency),
+    decimalPlaces: getDecimalPlaces(trnNl.to_currency),
+    decimalMantissa: getDecimalMantissa(
+      +trnNl.to_amount,
+      getDecimalPlaces(trnNl.to_currency)
+    ),
+  };
+
+  if (isExchange) {
+    toExchangePosting = {
+      account: getExchangeAccount(trnNl.from_currency),
+      amount: +trnNl.from_amount,
+      currency: getCurrency(trnNl.from_currency),
+      decimalPlaces: getDecimalPlaces(trnNl.from_currency),
+      decimalMantissa: getDecimalMantissa(
+        +trnNl.from_amount,
+        getDecimalPlaces(trnNl.from_currency)
+      ),
+    };
+    fromExchangePosting = {
+      account: getExchangeAccount(trnNl.to_currency),
+      amount: -1 * +trnNl.to_amount,
+      currency: getCurrency(trnNl.to_currency),
+      decimalPlaces: getDecimalPlaces(trnNl.to_currency),
+      decimalMantissa: getDecimalMantissa(
+        -1 * +trnNl.to_amount,
+        getDecimalPlaces(trnNl.to_currency)
+      ),
+    };
+  }
+
+  return {
+    date: dateFormat(new Date()),
+    description: "Transfer",
+    comment: match.groups.comment ? trim(match.groups.comment) : undefined,
+    postings: (
+      [toPosting, fromPosting, toExchangePosting, fromExchangePosting].filter(
+        (t) => t !== null
+      ) as IPosting[]
+    ).sort((a, b) => a.account.localeCompare(b.account)),
+  };
+}
+
+function getExchangeAccount(currency: string) {
+  return `Equity:Conversion:${currency.toUpperCase()}`;
 }

@@ -7,7 +7,7 @@ describe("simple spendings", () => {
       description: "Cafe",
       postings: [
         {
-          account: "Assets:Cash:Pavel:USD",
+          account: "Assets:Cash:USD",
           amount: -120,
           currency: "USD",
           decimalPlaces: 2,
@@ -17,6 +17,50 @@ describe("simple spendings", () => {
           account: "Expenses:Live:Restraunt:USD",
           amount: 120,
           currency: "USD",
+          decimalPlaces: 2,
+          decimalMantissa: 12000,
+        },
+      ].sort((a, b) => a.account.localeCompare(b.account)),
+    });
+  });
+  test("deniz 120 try cafe", () => {
+    expect(parse("deniz 120 try cafe")).toMatchObject({
+      date: dateFormat(new Date()),
+      description: "Cafe",
+      postings: [
+        {
+          account: "Assets:Deniz:TRY",
+          amount: -120,
+          currency: "TRY",
+          decimalPlaces: 2,
+          decimalMantissa: -12000,
+        },
+        {
+          account: "Expenses:Live:Restraunt:TRY",
+          amount: 120,
+          currency: "TRY",
+          decimalPlaces: 2,
+          decimalMantissa: 12000,
+        },
+      ].sort((a, b) => a.account.localeCompare(b.account)),
+    });
+  });
+  test("papara 120 try cafe", () => {
+    expect(parse("papara 120 try cafe")).toMatchObject({
+      date: dateFormat(new Date()),
+      description: "Cafe",
+      postings: [
+        {
+          account: "Assets:Papara:TRY",
+          amount: -120,
+          currency: "TRY",
+          decimalPlaces: 2,
+          decimalMantissa: -12000,
+        },
+        {
+          account: "Expenses:Live:Restraunt:TRY",
+          amount: 120,
+          currency: "TRY",
           decimalPlaces: 2,
           decimalMantissa: 12000,
         },
@@ -120,7 +164,7 @@ describe("simple spendings", () => {
       comment: "some comment",
       postings: [
         {
-          account: "Assets:Cash:Pavel:RUB",
+          account: "Assets:Cash:RUB",
           amount: -120,
           currency: "RUB",
           decimalPlaces: 2,
@@ -161,7 +205,7 @@ describe("simple transfers", () => {
       ].sort((a, b) => a.account.localeCompare(b.account)),
     });
   });
-  test("transfer 100 try pavel to 100 try alena", () => {
+  test("transfer 100 try pavel to 100 try alena ; some comment", () => {
     expect(
       parse("transfer 100 try pavel to 100 try alena ; some comment")
     ).toMatchObject({
@@ -190,41 +234,41 @@ describe("simple transfers", () => {
 
 describe("conversion transfers", () => {
   test("transfer 100 busd crypto to 99 tether crypto", () => {
-    expect(
-      parse("transfer 100 busd crypto to 100 tether crypto")
-    ).toMatchObject({
-      date: dateFormat(new Date()),
-      description: "Transfer",
-      postings: [
-        {
-          account: "Assets:Crypto:BUSD",
-          amount: -100,
-          currency: "BUSD",
-          decimalPlaces: 10,
-          decimalMantissa: -1000000000000,
-        },
-        {
-          account: "Equity:Conversion:BUSD",
-          amount: 100,
-          currency: "BUSD",
-          decimalPlaces: 10,
-          decimalMantissa: 1000000000000,
-        },
-        {
-          account: "Equity:Conversion:TETHER",
-          amount: -99,
-          currency: "TETHER",
-          decimalPlaces: 10,
-          decimalMantissa: -990000000000,
-        },
-        {
-          account: "Assets:Crypto:TETHER",
-          amount: 99,
-          currency: "TETHER",
-          decimalPlaces: 10,
-          decimalMantissa: 990000000000,
-        },
-      ].sort((a, b) => a.account.localeCompare(b.account)),
-    });
+    expect(parse("transfer 100 busd crypto to 99 tether crypto")).toMatchObject(
+      {
+        date: dateFormat(new Date()),
+        description: "Transfer",
+        postings: [
+          {
+            account: "Assets:Crypto:BUSD",
+            amount: -100,
+            currency: "BUSD",
+            decimalPlaces: 10,
+            decimalMantissa: -1000000000000,
+          },
+          {
+            account: "Equity:Conversion:BUSD",
+            amount: 100,
+            currency: "BUSD",
+            decimalPlaces: 10,
+            decimalMantissa: 1000000000000,
+          },
+          {
+            account: "Equity:Conversion:TETHER",
+            amount: -99,
+            currency: "TETHER",
+            decimalPlaces: 10,
+            decimalMantissa: -990000000000,
+          },
+          {
+            account: "Assets:Crypto:TETHER",
+            amount: 99,
+            currency: "TETHER",
+            decimalPlaces: 10,
+            decimalMantissa: 990000000000,
+          },
+        ].sort((a, b) => a.account.localeCompare(b.account)),
+      }
+    );
   });
 });
